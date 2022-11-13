@@ -48,9 +48,13 @@ idt_init(void) {
       */
     extern uintptr_t __vectors[];
     int i;
-    for (i = 0; i < sizeof(idt) / sizeof(struct gatedesc); i ++) {
+    for (i = 0; i < 256; i++) {
         SETGATE(idt[i], 0, GD_KTEXT, __vectors[i], DPL_KERNEL);
     }
+    // 只有0x80这个特殊，用户就能用，而且是trap门
+    SETGATE(idt[T_SYSCALL], 1, GD_KTEXT, __vectors[T_SYSCALL], DPL_USER);
+    SETGATE(idt[T_SWITCH_TOU], 0, GD_KTEXT, __vectors[T_SWITCH_TOU], DPL_KERNEL);
+    SETGATE(idt[T_SWITCH_TOK], 0, GD_KTEXT, __vectors[T_SWITCH_TOK], DPL_USER);
     lidt(&idt_pd);
 }
 
@@ -153,9 +157,8 @@ trap_dispatch(struct trapframe *tf) {
          * (2) Every TICK_NUM cycle, you can print some info using a funciton, such as print_ticks().
          * (3) Too Simple? Yes, I think so!
          */
-        ++ticks;
-        if(ticks==TICK_NUM){
-            ticks=0;
+        ticks++;
+        if (ticks % TICK_NUM == 0) {
             print_ticks();
         }
         break;
@@ -166,11 +169,52 @@ trap_dispatch(struct trapframe *tf) {
     case IRQ_OFFSET + IRQ_KBD:
         c = cons_getc();
         cprintf("kbd [%03d] %c\n", c, c);
+        if (c == 51 && tf->tf_cs == KERNEL_CS) { //切换到用户态
+            struct trapframe fake_tf = *tf;
+            //设置段寄存器
+            fake_tf.tf_cs = USER_CS;
+            fake_tf.tf_ss = fake_tf.tf_ds = fake_tf.tf_es = fake_tf.tf_fs = fake_tf.tf_gs = USER_DS;
+            //设置esp，相当于骗CPU，让它以为是从U到K，然后他就会恢复esp的值
+            fake_tf.tf_esp = (&tf->tf_esp);
+            //把eflags的IO位打开，要不切换到用户态后没办法打印信息了。
+            fake_tf.tf_eflags |= FL_IOPL_MASK;
+            //存在栈里的esp指向了tf的首地址，这里把这个esp的值改了，pop之后
+            //的esp就指向fake_tf了
+            *((uint32_t*)tf - 1) = &fake_tf;
+        }
+        else if (c == 48 && tf->tf_cs == USER_CS) { //切换到内核态
+            struct trapframe fake_tf = *tf;
+            //设置段寄存器
+            fake_tf.tf_cs = KERNEL_CS;
+            fake_tf.tf_ss = fake_tf.tf_ds = fake_tf.tf_es = fake_tf.tf_fs = fake_tf.tf_gs = KERNEL_DS;
+            fake_tf.tf_eflags &= ~FL_IOPL_MASK;
+            uintptr_t user_tf_add = (struct trapframe*)fake_tf.tf_esp - 1;
+            user_tf_add += 8;
+            __memmove(user_tf_add, &fake_tf, sizeof(struct trapframe) - 8);
+            //存在栈里的esp指向了tf的首地址，这里把这个esp的值改了，pop之后
+            //的esp就指向fake_tf了
+            *((uint32_t*)tf - 1) = user_tf_add;
+        }
         break;
     //LAB1 CHALLENGE 1 : YOUR CODE you should modify below codes.
     case T_SWITCH_TOU:
+        if (tf->tf_cs != USER_CS) {
+            //设置段寄存
+            tf->tf_cs = USER_CS;
+            tf->tf_ss = tf->tf_ds = tf->tf_es = tf->tf_fs = tf->tf_gs = USER_DS;
+            tf->tf_esp += 4;
+            //把eflags的IO位打开，要不切换到用户态后没办法打印信息了。
+            tf->tf_eflags |= FL_IOPL_MASK;
+        }
+        break;
     case T_SWITCH_TOK:
-        panic("T_SWITCH_** ??\n");
+        if (tf->tf_cs != KERNEL_CS) {
+            //设置段寄存器
+            tf->tf_cs = KERNEL_CS;
+            tf->tf_ss = tf->tf_ds = tf->tf_es = tf->tf_fs = tf->tf_gs = KERNEL_DS;
+            //把eflags的IO位关闭
+            tf->tf_eflags &= ~FL_IOPL_MASK;
+        }
         break;
     case IRQ_OFFSET + IRQ_IDE1:
     case IRQ_OFFSET + IRQ_IDE2:

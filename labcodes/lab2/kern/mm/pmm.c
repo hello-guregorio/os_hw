@@ -5,10 +5,15 @@
 #include <mmu.h>
 #include <memlayout.h>
 #include <pmm.h>
-#include <default_pmm.h>
 #include <sync.h>
 #include <error.h>
 
+#define __DEFAULT_PMM_MANAGER__
+#ifdef __DEFAULT_PMM_MANAGER__
+#include <default_pmm.h>
+#else
+#include <buddy_pmm.h>
+#endif
 /* *
  * Task State Segment:
  *
@@ -137,7 +142,11 @@ gdt_init(void) {
 //init_pmm_manager - initialize a pmm_manager instance
 static void
 init_pmm_manager(void) {
+#ifdef __DEFAULT_PMM_MANAGER__
     pmm_manager = &default_pmm_manager;
+#else
+    pmm_manager = &buddy_pmm_manager;
+#endif
     cprintf("memory management: %s\n", pmm_manager->name);
     pmm_manager->init();
 }
@@ -193,6 +202,7 @@ page_init(void) {
     uint64_t maxpa = 0;
 
     cprintf("e820map:\n");
+    // 检测出内存能用的最大物理地址
     int i;
     for (i = 0; i < memmap->nr_map; i ++) {
         uint64_t begin = memmap->map[i].addr, end = begin + memmap->map[i].size;
@@ -211,14 +221,16 @@ page_init(void) {
     extern char end[];
 
     npage = maxpa / PGSIZE;
+    // 内核之后就是pages结构体数组
     pages = (struct Page *)ROUNDUP((void *)end, PGSIZE);
 
     for (i = 0; i < npage; i ++) {
         SetPageReserved(pages + i);
     }
 
+    // 相当于最小能用的物理地址
     uintptr_t freemem = PADDR((uintptr_t)pages + sizeof(struct Page) * npage);
-
+    cprintf("freemem low addr: %x, high addr: %x\n", freemem, KMEMSIZE);
     for (i = 0; i < memmap->nr_map; i ++) {
         uint64_t begin = memmap->map[i].addr, end = begin + memmap->map[i].size;
         if (memmap->map[i].type == E820_ARM) {
@@ -276,7 +288,6 @@ void
 pmm_init(void) {
     // We've already enabled paging
     boot_cr3 = PADDR(boot_pgdir);
-
     //We need to alloc/free the physical memory (granularity is 4KB or other size). 
     //So a framework of physical memory manager (struct pmm_manager)is defined in pmm.h
     //First we should init a physical memory manager(pmm) based on the framework.
@@ -359,6 +370,30 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
     }
     return NULL;          // (8) return page table entry
 #endif
+    // 注意页目录表和页表存的都是物理地址，（如果是虚拟地址的话陷入循环了）
+    // 但是操作系统代码里要虚拟地址，CPU可以帮忙转
+    pte_t *result = NULL;
+    pde_t *pdep = &pgdir[PDX(la)];
+    pte_t *pte_base = NULL;
+    struct Page *page;
+    bool find_pte = 1;
+    if (*pdep & PTE_P) { //存在对应的页表
+        pte_base = KADDR(*pdep & ~0xFFF); 
+    } 
+    else if (create && (page = alloc_page()) != NULL) { //不存在对应的页表，但允许分配
+        set_page_ref(page, 1);
+        *pdep = page2pa(page);
+        pte_base = KADDR(*pdep);
+        memset(pte_base, 0, PGSIZE);
+        *pdep = *pdep | PTE_P | PTE_W | PTE_U;
+    }
+    else {
+        find_pte = 0;
+    }
+    if (find_pte) {
+        result = &pte_base[PTX(la)];
+    }
+    return result;
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
@@ -404,6 +439,17 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
                                   //(6) flush tlb
     }
 #endif
+    if (!(*ptep & PTE_P)) {
+        return;
+    }
+    struct Page *page = pte2page(*ptep);
+    page_ref_dec(page);
+    if (page->ref <= 0) {
+        free_page(page);
+    }
+    *ptep = 0;
+    tlb_invalidate(pgdir, la);
+    return;
 }
 
 //page_remove - free an Page which is related linear address la and has an validated pte

@@ -43,22 +43,25 @@ seta20.2:
     movb $0xdf, %al                                 # 0xdf -> port 0x60
     outb %al, $0x60                                 # 0xdf = 11011111, means set P2's A20 bit(the 1 bit) to 1
 
+# 啥是ards结构，存内存的基址长度和类型
 probe_memory:
-    movl $0, 0x8000
-    xorl %ebx, %ebx
-    movw $0x8004, %di
+    movl $0, 0x8000     # 这个地址应该记录的是调用bios例程一共读出的ards结构个数
+    xorl %ebx, %ebx     # 第一次调用一定置零
+    movw $0x8004, %di   # 把ards结构写入到es:di指向的缓冲区
 start_probe:
-    movl $0xE820, %eax
-    movl $20, %ecx
-    movl $SMAP, %edx
+    # https://blog.csdn.net/weixin_39855658/article/details/111124560?spm=1001.2101.3001.6661.1&utm_medium=distribute.pc_relevant_t0.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-111124560-blog-122760587.pc_relevant_aa&depth_1-utm_source=distribute.pc_relevant_t0.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-111124560-blog-122760587.pc_relevant_aa&utm_relevant_index=1
+    movl $0xE820, %eax  # bios中断0x15的子功能0xE820能够获取系统的内存布局
+                        # 由于系统内存各部分的类型属性不同，bios就按照类型属性来划分这片系统内存，所以这种查询则呈迭代式，每次bios只返回一种类型的内存信息，直到将所有内存类型返回完毕。
+    movl $20, %ecx      # 一个ards结构占20个字节，所以这里传一个20，（可扩展性？）
+    movl $SMAP, %edx    # 就是SMAP的ascii码，用于校验
     int $0x15
-    jnc cont
+    jnc cont            # CF=0则跳转，CF=0表示调用未出错
     movw $12345, 0x8000
     jmp finish_probe
 cont:
     addw $20, %di
     incl 0x8000
-    cmpl $0, %ebx
+    cmpl $0, %ebx       # CF=0&&ebx=0，表示这是最后一个ards结构
     jnz start_probe
 finish_probe:
 
