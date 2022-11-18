@@ -6,7 +6,7 @@
 #define MAX_ORDER 14
 #define MAX_BIT_LENGTH 512
 
-static intptr_t base_page; // 记录基虚拟地址页
+static intptr_t base_page; // 记录基页地址
 static int32_t bit_map[MAX_ORDER + 1][MAX_BIT_LENGTH];
 #define offset(p) (((intptr_t)p - base_page) / sizeof(struct Page))
 
@@ -39,10 +39,11 @@ buddy_init(void) {
     }
 }
 
-static inline void 
+static inline int 
 flip_bit_map(int32_t order, struct Page* page) {
     int32_t bit_num = (offset(page) >> (order + 1));
     bit_map[order][bit_num / 32] ^= (1 << (bit_num % 32));
+    return (bit_map[order][bit_num / 32] & (1 << (bit_num % 32))) != 0;
 }
 
 static void
@@ -153,9 +154,8 @@ buddy_free_pages(struct Page *base, size_t n) {
     }
     base->property = n;
     // 开始尝试合并页框
-    flip_bit_map(now_order, base);
-    intptr_t bit_num = (offset(base) >> (now_order + 1));
-    while (now_order < MAX_ORDER && (bit_map[now_order][bit_num / 32] & (1 << (bit_num % 32))) == 0) {
+    int bit = flip_bit_map(now_order, base);
+    while (now_order < MAX_ORDER && bit == 0) {
         // 得到当前插入页框的buddy
         struct Page *now_buddy = get_buddy(base, now_order);
         list_del(&now_buddy->page_link);
@@ -166,8 +166,7 @@ buddy_free_pages(struct Page *base, size_t n) {
         }
         base->property <<= 1;
         now_order += 1;
-        flip_bit_map(now_order, base);
-        bit_num = (offset(base) >> (now_order + 1));
+        bit = flip_bit_map(now_order, base);
     }
     SetPageProperty(base);
     nr_free(now_order) += base->property;

@@ -8,7 +8,7 @@
 #include <sync.h>
 #include <error.h>
 
-#define __DEFAULT_PMM_MANAGER__
+// #define __DEFAULT_PMM_MANAGER__
 #ifdef __DEFAULT_PMM_MANAGER__
 #include <default_pmm.h>
 #else
@@ -453,6 +453,7 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
 }
 
 //page_remove - free an Page which is related linear address la and has an validated pte
+// 个人理解是释放虚拟页
 void
 page_remove(pde_t *pgdir, uintptr_t la) {
     pte_t *ptep = get_pte(pgdir, la, 0);
