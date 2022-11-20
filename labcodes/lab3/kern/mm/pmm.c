@@ -158,16 +158,19 @@ alloc_pages(size_t n) {
     
     while (1)
     {
+        // 如果中断开了，把它关上
          local_intr_save(intr_flag);
          {
               page = pmm_manager->alloc_pages(n);
          }
+        // 恢复中断状态
          local_intr_restore(intr_flag);
 
          if (page != NULL || n > 1 || swap_init_ok == 0) break;
          
          extern struct mm_struct *check_mm_struct;
          //cprintf("page %x, call swap_out in alloc_pages %d\n",page, n);
+         // 不够了就换出
          swap_out(check_mm_struct, n, 0);
     }
     //cprintf("n %d,get page %x, No %d in alloc_pages\n",n,page,(page-pages));
@@ -679,7 +682,7 @@ void *
 kmalloc(size_t n) {
     void * ptr=NULL;
     struct Page *base=NULL;
-    assert(n > 0 && n < 1024*0124);
+    assert(n > 0 && n < 1024*0124); // 这里n为啥有上限嘞
     int num_pages=(n+PGSIZE-1)/PGSIZE;
     base = alloc_pages(num_pages);
     assert(base != NULL);

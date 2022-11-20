@@ -69,25 +69,26 @@ vma_create(uintptr_t vm_start, uintptr_t vm_end, uint32_t vm_flags) {
 }
 
 
-// find_vma - find a vma  (vma->vm_start <= addr <= vma_vm_end)
+// find_vma - find a vma  (vma->vm_start <= addr < vma->vm_end)
 struct vma_struct *
 find_vma(struct mm_struct *mm, uintptr_t addr) {
     struct vma_struct *vma = NULL;
     if (mm != NULL) {
         vma = mm->mmap_cache;
         if (!(vma != NULL && vma->vm_start <= addr && vma->vm_end > addr)) {
-                bool found = 0;
-                list_entry_t *list = &(mm->mmap_list), *le = list;
-                while ((le = list_next(le)) != list) {
-                    vma = le2vma(le, list_link);
-                    if (vma->vm_start<=addr && addr < vma->vm_end) {
-                        found = 1;
-                        break;
-                    }
+            bool found = 0;
+            // 从缓冲没有找到，就从头开始找
+            list_entry_t *list = &(mm->mmap_list), *le = list;
+            while ((le = list_next(le)) != list) {
+                vma = le2vma(le, list_link);
+                if (vma->vm_start<=addr && addr < vma->vm_end) {
+                    found = 1;
+                    break;
                 }
-                if (!found) {
-                    vma = NULL;
-                }
+            }
+            if (!found) {
+                vma = NULL;
+            }
         }
         if (vma != NULL) {
             mm->mmap_cache = vma;
@@ -148,7 +149,7 @@ mm_destroy(struct mm_struct *mm) {
         kfree(le2vma(le, list_link),sizeof(struct vma_struct));  //kfree vma        
     }
     kfree(mm, sizeof(struct mm_struct)); //kfree mm
-    mm=NULL;
+    mm=NULL; // 这一句有啥意义鸭
 }
 
 // vmm_init - initialize virtual memory management
@@ -315,7 +316,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     }
     //check the error_code
     switch (error_code & 3) {
-    default:
+    default: // 可能是写时复制，也可能是没有写权限
             /* error code flag : default is 3 ( W/R=1, P=1): write, present */
     case 2: /* error code flag : (W/R=1, P=0): write, not present */
         if (!(vma->vm_flags & VM_WRITE)) {
@@ -324,6 +325,7 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         }
         break;
     case 1: /* error code flag : (W/R=0, P=1): read, present */
+        // 这种情况直接嘎
         cprintf("do_pgfault failed: error code flag = read AND present\n");
         goto failed;
     case 0: /* error code flag : (W/R=0, P=0): read, not present */
@@ -364,12 +366,15 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     *   mm->pgdir : the PDT of these vma
     *
     */
-#if 0
+#if 1
     /*LAB3 EXERCISE 1: YOUR CODE*/
-    ptep = ???              //(1) try to find a pte, if pte's PT(Page Table) isn't existed, then create a PT.
-    if (*ptep == 0) {
-                            //(2) if the phy addr isn't exist, then alloc a page & map the phy addr with logical addr
-
+    if ((ptep = get_pte(mm->pgdir, addr, 1)) == NULL) {
+        goto failed;        
+    }       
+    if (*ptep == 0) {            
+        if ((pgdir_alloc_page(mm->pgdir, addr, perm)) == NULL) {
+            goto failed;
+        }
     }
     else {
     /*LAB3 EXERCISE 2: YOUR CODE
@@ -384,11 +389,13 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
     *    swap_map_swappable ： set the page swappable
     */
         if(swap_init_ok) {
-            struct Page *page=NULL;
-                                    //(1）According to the mm AND addr, try to load the content of right disk page
-                                    //    into the memory which page managed.
-                                    //(2) According to the mm, addr AND page, setup the map of phy addr <---> logical addr
-                                    //(3) make the page swappable.
+            struct Page *page = NULL;
+            if ((swap_in(mm, addr, &page)) != 0) {        
+                goto failed;
+            }                                            
+            page_insert(mm->pgdir, page, addr, perm);   
+            swap_map_swappable(mm, addr, page, 1);      
+            page->pra_vaddr = addr;
         }
         else {
             cprintf("no swap_init_ok but ptep is %x, failed\n",*ptep);

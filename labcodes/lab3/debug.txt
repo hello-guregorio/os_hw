@@ -1,0 +1,89 @@
+(THU.CST) os is loading ...
+
+Special kernel symbols:
+  entry  0xc0100036 (phys)
+  etext  0xc0109558 (phys)
+  edata  0xc0124000 (phys)
+  end    0xc0125130 (phys)
+Kernel executable memory footprint: 149KB
+ebp:c0120f38 eip:c01009ec args:00010094 00000000 c0120f68 c01000d7
+    kern/debug/kdebug.c:309: print_stackframe+22
+ebp:c0120f48 eip:c0100cda args:00000000 00000000 00000000 c0120fb8
+    kern/debug/kmonitor.c:129: mon_backtrace+10
+ebp:c0120f68 eip:c01000d7 args:00000000 c0120f90 ffff0000 c0120f94
+    kern/init/init.c:57: grade_backtrace2+33
+ebp:c0120f88 eip:c0100100 args:00000000 ffff0000 c0120fb4 0000002a
+    kern/init/init.c:62: grade_backtrace1+38
+ebp:c0120fa8 eip:c010011e args:00000000 c0100036 ffff0000 0000001d
+    kern/init/init.c:67: grade_backtrace0+23
+ebp:c0120fc8 eip:c0100143 args:c010957c c0109560 00001130 00000000
+    kern/init/init.c:72: grade_backtrace+34
+ebp:c0120ff8 eip:c010008b args:c0109718 c0109720 c0100c60 c010973f
+    kern/init/init.c:32: kern_init+84
+memory management: default_pmm_manager
+e820map:
+  memory: 0009fc00, [00000000, 0009fbff], type = 1.
+  memory: 00000400, [0009fc00, 0009ffff], type = 2.
+  memory: 00010000, [000f0000, 000fffff], type = 2.
+  memory: 07efe000, [00100000, 07ffdfff], type = 1.
+  memory: 00002000, [07ffe000, 07ffffff], type = 2.
+  memory: 00040000, [fffc0000, ffffffff], type = 2.
+check_alloc_page() succeeded!
+check_pgdir() succeeded!
+check_boot_pgdir() succeeded!
+-------------------- BEGIN --------------------
+PDE(0e0) c0000000-f8000000 38000000 urw
+  |-- PTE(38000) c0000000-f8000000 38000000 -rw
+PDE(001) fac00000-fb000000 00400000 -rw
+  |-- PTE(000e0) faf00000-fafe0000 000e0000 urw
+  |-- PTE(00001) fafeb000-fafec000 00001000 -rw
+--------------------- END ---------------------
+check_vma_struct() succeeded!
+page fault at 0x00000100: K/W [no page found].
+check_pgfault() succeeded!
+check_vmm() succeeded.
+ide 0:      10000(sectors), 'QEMU HARDDISK'.
+ide 1:     262144(sectors), 'QEMU HARDDISK'.
+SWAP: manager = extended clock swap manager
+BEGIN check_swap: count 1, total 31993
+setup Page Table for vaddr 0X1000, so alloc a page
+setup Page Table vaddr 0~4MB OVER!
+set up init env for check_swap begin!
+page fault at 0x00001000: K/W [no page found].
+page fault at 0x00002000: K/W [no page found].
+page fault at 0x00003000: K/W [no page found].
+page fault at 0x00004000: K/W [no page found].
+set up init env for check_swap over!
+write Virt Page c in fifo_check_swap
+write Virt Page a in fifo_check_swap
+write Virt Page d in fifo_check_swap
+write Virt Page b in fifo_check_swap
+write Virt Page e in fifo_check_swap
+page fault at 0x00005000: K/W [no page found].
+swap_out: i 0, store page in vaddr 0x1000 to disk swap entry 2
+write Virt Page b in fifo_check_swap
+write Virt Page a in fifo_check_swap
+page fault at 0x00001000: K/W [no page found].
+swap_out: i 0, store page in vaddr 0x3000 to disk swap entry 4
+swap_in: load disk swap entry 2 with swap_page in vadr 0x1000
+write Virt Page b in fifo_check_swap
+kernel panic at kern/mm/swap_extended_clock.c:129:
+    assertion failed: pgfault_num == 7
+stack trackback:
+ebp:c0120ea8 eip:c01009ec args:c010984c c0120eec 00000081 00000023
+    kern/debug/kdebug.c:309: print_stackframe+22
+ebp:c0120ed8 eip:c0100d4b args:c010ac87 00000081 c010ac72 c010add0
+    kern/debug/panic.c:27: __panic+105
+ebp:c0120ef8 eip:c010738d args:0030b000 00000001 c0120f24 00000025
+    kern/mm/swap_extended_clock.c:129: _ext_clock_check_swap+533
+ebp:c0120f18 eip:c0106739 args:c010abf4 00004000 00000000 00000000
+    kern/mm/swap.c:177: check_content_access+15
+ebp:c0120f98 eip:c0106cbd args:c010a8ab c010ae4b 74004021 c0120d84
+    kern/mm/swap.c:267: check_swap+1403
+ebp:c0120fc8 eip:c010629d args:c010957c c0109560 00001130 00000000
+    kern/mm/swap.c:58: swap_init+138
+ebp:c0120ff8 eip:c01000a9 args:c0109718 c0109720 c0100c60 c010973f
+    kern/init/init.c:42: kern_init+114
+Welcome to the kernel debug monitor!!
+Type 'help' for a list of commands.
+K> 
