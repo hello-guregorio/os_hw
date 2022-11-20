@@ -1,11 +1,17 @@
 #include <swap.h>
 #include <swapfs.h>
-#include <swap_fifo.h>
 #include <stdio.h>
 #include <string.h>
 #include <memlayout.h>
 #include <pmm.h>
 #include <mmu.h>
+
+#define __EXT_CLOCK__
+#ifdef __EXT_CLOCK__
+#include <swap_extended_clock.h>
+#else
+#include <swap_fifo.h>
+#endif
 
 // the valid vaddr for check is between 0~CHECK_VALID_VADDR-1
 #define CHECK_VALID_VIR_PAGE_NUM 5
@@ -17,7 +23,7 @@
 #define MAX_SEQ_NO 10
 
 static struct swap_manager *sm;
-size_t max_swap_offset;
+size_t max_swap_offset; // 交换空间最多有几个页
 
 volatile int swap_init_ok = 0;
 
@@ -38,7 +44,11 @@ swap_init(void)
      }
      
 
+     #ifdef __EXT_CLOCK__
+     sm = &swap_manager_extended_clock;
+     #else
      sm = &swap_manager_fifo;
+     #endif
      int r = sm->init();
      
      if (r == 0)
@@ -89,8 +99,8 @@ swap_out(struct mm_struct *mm, int n, int in_tick)
           // cprintf("i %d, SWAP: call swap_out_victim\n",i);
           int r = sm->swap_out_victim(mm, &page, in_tick);
           if (r != 0) {
-                    cprintf("i %d, swap_out: call swap_out_victim failed\n",i);
-                  break;
+               cprintf("i %d, swap_out: call swap_out_victim failed\n",i);
+               break;
           }          
           //assert(!PageReserved(page));
 
@@ -100,15 +110,18 @@ swap_out(struct mm_struct *mm, int n, int in_tick)
           pte_t *ptep = get_pte(mm->pgdir, v, 0);
           assert((*ptep & PTE_P) != 0);
 
+          // 虚拟页对应的PTE的索引值 = swap page的扇区起始位置*8？这个公式不对吧
+          // 虚拟页的页号 + 1 = 交换空间对应的页号
+          // 这里为啥要加1嘞，因为交换空间第一页是不能用的，用于区分虚拟到物理的映射到底是不存在，还是被交换到了磁盘
           if (swapfs_write( (page->pra_vaddr/PGSIZE+1)<<8, page) != 0) {
-                    cprintf("SWAP: failed to save\n");
-                    sm->map_swappable(mm, v, page, 0);
-                    continue;
+               cprintf("SWAP: failed to save\n");
+               sm->map_swappable(mm, v, page, 0); // 换出失败了再插回去，这里感觉需要避免死循环的问题
+               continue;
           }
           else {
-                    cprintf("swap_out: i %d, store page in vaddr 0x%x to disk swap entry %d\n", i, v, page->pra_vaddr/PGSIZE+1);
-                    *ptep = (page->pra_vaddr/PGSIZE+1)<<8;
-                    free_page(page);
+               cprintf("swap_out: i %d, store page in vaddr 0x%x to disk swap entry %d\n", i, v, page->pra_vaddr/PGSIZE+1);
+               *ptep = (page->pra_vaddr/PGSIZE+1)<<8;
+               free_page(page);
           }
           
           tlb_invalidate(mm->pgdir, v);

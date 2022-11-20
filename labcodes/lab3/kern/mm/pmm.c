@@ -158,16 +158,19 @@ alloc_pages(size_t n) {
     
     while (1)
     {
+        // 如果中断开了，把它关上
          local_intr_save(intr_flag);
          {
               page = pmm_manager->alloc_pages(n);
          }
+        // 恢复中断状态
          local_intr_restore(intr_flag);
 
          if (page != NULL || n > 1 || swap_init_ok == 0) break;
          
          extern struct mm_struct *check_mm_struct;
          //cprintf("page %x, call swap_out in alloc_pages %d\n",page, n);
+         // 不够了就换出
          swap_out(check_mm_struct, n, 0);
     }
     //cprintf("n %d,get page %x, No %d in alloc_pages\n",n,page,(page-pages));
@@ -372,6 +375,30 @@ get_pte(pde_t *pgdir, uintptr_t la, bool create) {
     }
     return NULL;          // (8) return page table entry
 #endif
+    // 注意页目录表和页表存的都是物理地址，（如果是虚拟地址的话陷入循环了）
+    // 但是操作系统代码里要虚拟地址，CPU可以帮忙转
+    pte_t *result = NULL;
+    pde_t *pdep = &pgdir[PDX(la)];
+    pte_t *pte_base = NULL;
+    struct Page *page;
+    bool find_pte = 1;
+    if (*pdep & PTE_P) { //存在对应的页表
+        pte_base = KADDR(*pdep & ~0xFFF); 
+    } 
+    else if (create && (page = alloc_page()) != NULL) { //不存在对应的页表，但允许分配
+        set_page_ref(page, 1);
+        *pdep = page2pa(page);
+        pte_base = KADDR(*pdep);
+        memset(pte_base, 0, PGSIZE);
+        *pdep = *pdep | PTE_P | PTE_W | PTE_U;
+    }
+    else {
+        find_pte = 0;
+    }
+    if (find_pte) {
+        result = &pte_base[PTX(la)];
+    }
+    return result;
 }
 
 //get_page - get related Page struct for linear address la using PDT pgdir
@@ -417,6 +444,17 @@ page_remove_pte(pde_t *pgdir, uintptr_t la, pte_t *ptep) {
                                   //(6) flush tlb
     }
 #endif
+    if (!(*ptep & PTE_P)) {
+        return;
+    }
+    struct Page *page = pte2page(*ptep);
+    page_ref_dec(page);
+    if (page->ref <= 0) {
+        free_page(page);
+    }
+    *ptep = 0;
+    tlb_invalidate(pgdir, la);
+    return;
 }
 
 //page_remove - free an Page which is related linear address la and has an validated pte
@@ -644,7 +682,7 @@ void *
 kmalloc(size_t n) {
     void * ptr=NULL;
     struct Page *base=NULL;
-    assert(n > 0 && n < 1024*0124);
+    assert(n > 0 && n < 1024*0124); // 这里n为啥有上限嘞
     int num_pages=(n+PGSIZE-1)/PGSIZE;
     base = alloc_pages(num_pages);
     assert(base != NULL);
