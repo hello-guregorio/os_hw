@@ -7,10 +7,7 @@
 #include <list.h>
 
 list_entry_t pra_list_head; // 链表头，把所有可交换的页连接起来
-/*
- * (2) _fifo_init_mm: init pra_list_head and let  mm->sm_priv point to the addr of pra_list_head.
- *              Now, From the memory control struct mm_struct, we can access FIFO PRA
- */
+
 static int
 _ext_clock_init_mm(struct mm_struct *mm)
 {
@@ -18,9 +15,7 @@ _ext_clock_init_mm(struct mm_struct *mm)
     mm->sm_priv = &pra_list_head;
     return 0;
 }
-/*
- * (3)_fifo_map_swappable: According FIFO PRA, we should link the most recent arrival page at the back of pra_list_head qeueue
- */
+
 static int
 _ext_clock_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page, int swap_in)
 {
@@ -29,74 +24,78 @@ _ext_clock_map_swappable(struct mm_struct *mm, uintptr_t addr, struct Page *page
 
     assert(entry != NULL && head != NULL);
     // record the page access situlation
-    /*LAB3 EXERCISE 2: YOUR CODE*/
-    //(1)link the most recent arrival page at the back of the pra_list_head qeueue.
     list_add_before(head, entry);
     return 0;
 }
-/*
- *  (4)_fifo_swap_out_victim: According FIFO PRA, we should unlink the  earliest arrival page in front of pra_list_head qeueue,
- *                            then assign the value of *ptr_page to the addr of this page.
- */
+
 static int
 _ext_clock_swap_out_victim(struct mm_struct *mm, struct Page **ptr_page, int in_tick)
 {
     list_entry_t *head = (list_entry_t *)mm->sm_priv;
     assert(head != NULL);
     assert(in_tick == 0);
-    // 最多需要找两遍
-    struct Page *result_page; 
-    list_entry_t *result_le;
-    result_page = NULL;
+    // 最多得三遍遍历
+    // 先找00的
     list_entry_t *le = head;
     while ((le = list_next(le)) != head) {
         struct Page *page = le2page(le, pra_page_link);
         assert(page != NULL);
         pte_t *pte = get_pte(mm->pgdir, page->pra_vaddr, 0);
         assert(pte != NULL);
-        // 如果找到00，直接返回
+        // 如果找到00的了，直接返回
         if (!(*pte & PTE_A) && !(*pte & PTE_D)) {
             list_del(le);
             *ptr_page = page;
             return 0;
-        } 
+        }
+    }
+    // 然后找01的，这时候碰上1*的，把1刷成0
+    le = head;
+    while ((le = list_next(le)) != head) {
+        struct Page *page = le2page(le, pra_page_link);
+        assert(page != NULL);
+        pte_t *pte = get_pte(mm->pgdir, page->pra_vaddr, 0);
+        assert(pte != NULL);
+        // 找到了01的，直接返回
+        if (!(*pte & PTE_A) && (*pte & PTE_D)) {
+            list_del(le);
+            *ptr_page = page;
+            return 0;
+        }
+        // 当前是1*，把1刷成0
+        else if (*pte & PTE_A) {
+            *pte &= (~PTE_A);
+            tlb_invalidate(mm->pgdir, page->pra_vaddr);
+        }
+    }
+    // 第三遍，找00和01的
+    struct Page *result_page = NULL;
+    list_entry_t *result_le;
+    le = head;
+    while ((le = list_next(le)) != head) {
+        struct Page *page = le2page(le, pra_page_link);
+        assert(page != NULL);
+        pte_t *pte = get_pte(mm->pgdir, page->pra_vaddr, 0);
+        assert(pte != NULL);
+        // 如果找到00的了，直接返回
+        if (!(*pte & PTE_A) && !(*pte & PTE_D)) {
+            list_del(le);
+            *ptr_page = page;
+            return 0;
+        }
         // 如果当前是01，则看看前边有没有01，若没有，则赋值result_page
         else if (!(*pte & PTE_A) && (*pte & PTE_D) && result_page == NULL) {
             result_le = le;
             result_page = page;
         }
-        // 如果当前是1*，则看看有没有找到01，若没有，则把1给赋值为0
-        else if (result_page == NULL) {
-            *pte &= (~PTE_A);
-            tlb_invalidate(mm->pgdir, page->pra_vaddr);
-        }
     }
-    // 如果第一遍没找到00，找到了01，返回01
+    // 如果最后一遍没有找到00，找到了01，返回01
     if (result_page != NULL) {
         list_del(result_le);
         *ptr_page = result_page;
         return 0;
     }
-    le = head;
-    // 第二遍找，第一遍的时候已经把1*给刷成0*了，所以这里不需要再改页表项了
-    while ((le = list_next(le)) != head) {
-        struct Page *page = le2page(le, pra_page_link);
-        pte_t *pte = get_pte(mm->pgdir, page->pra_vaddr, 0);
-        if (!(*pte & PTE_A) && !(*pte & PTE_D)) {
-            list_del(le);
-            *ptr_page = page;
-            return 0;
-        }
-        else if (!(*pte & PTE_A) && (*pte & PTE_D) && result_page == NULL) {
-            result_le = le;
-            result_page = page;
-        }
-    }
-    if (result_page != NULL) {
-        list_del(result_le);
-        *ptr_page = result_page;
-        return 0;
-    }
+    // 嘎了
     return -1;
 }
 

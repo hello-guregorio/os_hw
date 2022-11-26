@@ -6,7 +6,7 @@
 #include <pmm.h>
 #include <mmu.h>
 
-#define __EXT_CLOCK__
+// #define __EXT_CLOCK__
 #ifdef __EXT_CLOCK__
 #include <swap_extended_clock.h>
 #else
@@ -120,6 +120,7 @@ swap_out(struct mm_struct *mm, int n, int in_tick)
           }
           else {
                cprintf("swap_out: i %d, store page in vaddr 0x%x to disk swap entry %d\n", i, v, page->pra_vaddr/PGSIZE+1);
+               // 页表项在这里已经改过了
                *ptep = (page->pra_vaddr/PGSIZE+1)<<8;
                free_page(page);
           }
@@ -135,6 +136,7 @@ swap_in(struct mm_struct *mm, uintptr_t addr, struct Page **ptr_result)
      struct Page *result = alloc_page();
      assert(result!=NULL);
 
+     // 这里为啥create是0，要是换入的话，页表项肯定的是swap_entry，不会出现invalid的情况
      pte_t *ptep = get_pte(mm->pgdir, addr, 0);
      // cprintf("SWAP: load ptep %x swap entry %d to vaddr 0x%08x, page %x, No %d\n", ptep, (*ptep)>>8, addr, result, (result-pages));
     

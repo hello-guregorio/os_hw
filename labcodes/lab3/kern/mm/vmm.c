@@ -315,8 +315,9 @@ do_pgfault(struct mm_struct *mm, uint32_t error_code, uintptr_t addr) {
         goto failed;
     }
     //check the error_code
+    // 这里为啥是&3而不是&7，感觉是因为vma限制了用户态的虚拟地址范围，就是说，如果vma不合法，包含了用户访问内核虚拟地址
     switch (error_code & 3) {
-    default: // 可能是写时复制，也可能是没有写权限
+    default: // 没有写权限
             /* error code flag : default is 3 ( W/R=1, P=1): write, present */
     case 2: /* error code flag : (W/R=1, P=0): write, not present */
         if (!(vma->vm_flags & VM_WRITE)) {
