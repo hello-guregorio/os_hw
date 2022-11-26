@@ -6,12 +6,11 @@
 #include <pmm.h>
 #include <mmu.h>
 
-// #define __EXT_CLOCK__
-#ifdef __EXT_CLOCK__
 #include <swap_extended_clock.h>
-#else
 #include <swap_fifo.h>
-#endif
+
+#define ETC 1
+#define FIFO 2
 
 // the valid vaddr for check is between 0~CHECK_VALID_VADDR-1
 #define CHECK_VALID_VIR_PAGE_NUM 5
@@ -43,12 +42,17 @@ swap_init(void)
           panic("bad max_swap_offset %08x.\n", max_swap_offset);
      }
      
+     int op = FIFO;
+     switch (op)
+     {
+     case ETC:
+          sm = &swap_manager_extended_clock;
+          break;
+     default:
+          sm = &swap_manager_fifo;
+          break;
+     }
 
-     #ifdef __EXT_CLOCK__
-     sm = &swap_manager_extended_clock;
-     #else
-     sm = &swap_manager_fifo;
-     #endif
      int r = sm->init();
      
      if (r == 0)

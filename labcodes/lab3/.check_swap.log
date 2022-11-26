@@ -2,7 +2,7 @@
 
 Special kernel symbols:
   entry  0xc0100036 (phys)
-  etext  0xc010957e (phys)
+  etext  0xc0109683 (phys)
   edata  0xc0124000 (phys)
   end    0xc0125130 (phys)
 Kernel executable memory footprint: 149KB
@@ -16,9 +16,9 @@ ebp:c0120f88 eip:c0100100 args:00000000 ffff0000 c0120fb4 0000002a
     kern/init/init.c:62: grade_backtrace1+38
 ebp:c0120fa8 eip:c010011e args:00000000 c0100036 ffff0000 0000001d
     kern/init/init.c:67: grade_backtrace0+23
-ebp:c0120fc8 eip:c0100143 args:c010959c c0109580 00001130 00000000
+ebp:c0120fc8 eip:c0100143 args:c01096bc c01096a0 00001130 00000000
     kern/init/init.c:72: grade_backtrace+34
-ebp:c0120ff8 eip:c010008b args:c0109738 c0109740 c0100c60 c010975f
+ebp:c0120ff8 eip:c010008b args:c0109858 c0109860 c0100c60 c010987f
     kern/init/init.c:32: kern_init+84
 memory management: default_pmm_manager
 e820map:
@@ -94,17 +94,17 @@ End of Test.
 kernel panic at kern/trap/trap.c:20:
     EOT: kernel seems ok.
 stack trackback:
-ebp:c0120ee0 eip:c01009ec args:c010986c c0120f24 00000014 c0120f5c
+ebp:c0120ee0 eip:c01009ec args:c010998c c0120f24 00000014 c0120f5c
     kern/debug/kdebug.c:309: print_stackframe+22
-ebp:c0120f10 eip:c0100d4b args:c0109a0e 00000014 c01099f8 00000000
+ebp:c0120f10 eip:c0100d4b args:c0109b2e 00000014 c0109b18 00000000
     kern/debug/panic.c:27: __panic+105
 ebp:c0120f30 eip:c0102153 args:c0120f68 c0100352 c0100304 c0120f5c
     kern/trap/trap.c:20: print_ticks+65
-ebp:c0120f60 eip:c010282b args:c0120f8c c0100375 c010989c c0120fa4
+ebp:c0120f60 eip:c010282b args:c0120f8c c0100375 c01099bc c0120fa4
     kern/trap/trap.c:201: trap_dispatch+204
 ebp:c0120f80 eip:c01028e9 args:c0120f8c 00000001 00000000 c0120ff8
     kern/trap/trap.c:238: trap+16
-ebp:c0120ff8 eip:c0102901 args:c0109738 c0109740 c0100c60 c010975f
+ebp:c0120ff8 eip:c0102901 args:c0109858 c0109860 c0100c60 c010987f
     kern/trap/trapentry.S:24: <unknown>+0
 Welcome to the kernel debug monitor!!
 Type 'help' for a list of commands.
