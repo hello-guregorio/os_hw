@@ -17,7 +17,7 @@
 #define MAX_SEQ_NO 10
 
 static struct swap_manager *sm;
-size_t max_swap_offset;
+size_t max_swap_offset; // 交换空间最多有几个页
 
 volatile int swap_init_ok = 0;
 
@@ -100,6 +100,9 @@ swap_out(struct mm_struct *mm, int n, int in_tick)
           pte_t *ptep = get_pte(mm->pgdir, v, 0);
           assert((*ptep & PTE_P) != 0);
 
+          // 虚拟页对应的PTE的索引值 = swap page的扇区起始位置*8？这个公式不对吧
+          // 虚拟页的页号 + 1 = 交换空间对应的页号
+          // 这里为啥要加1嘞，因为交换空间第一页是不能用的，用于区分虚拟到物理的映射到底是不存在，还是被交换到了磁盘
           if (swapfs_write( (page->pra_vaddr/PGSIZE+1)<<8, page) != 0) {
                     cprintf("SWAP: failed to save\n");
                     sm->map_swappable(mm, v, page, 0);
@@ -122,6 +125,7 @@ swap_in(struct mm_struct *mm, uintptr_t addr, struct Page **ptr_result)
      struct Page *result = alloc_page();
      assert(result!=NULL);
 
+     // 这里为啥create是0，要是换入的话，页表项肯定的是swap_entry，不会出现invalid的情况
      pte_t *ptep = get_pte(mm->pgdir, addr, 0);
      // cprintf("SWAP: load ptep %x swap entry %d to vaddr 0x%08x, page %x, No %d\n", ptep, (*ptep)>>8, addr, result, (result-pages));
     
