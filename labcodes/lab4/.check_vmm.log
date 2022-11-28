@@ -2,24 +2,24 @@
 
 Special kernel symbols:
   entry  0xc0100036 (phys)
-  etext  0xc0109676 (phys)
-  edata  0xc0124000 (phys)
-  end    0xc0125130 (phys)
-Kernel executable memory footprint: 149KB
-ebp:c0120f38 eip:c01009ec args:00010094 00000000 c0120f68 c01000d7
+  etext  0xc0109fec (phys)
+  edata  0xc0127000 (phys)
+  end    0xc012a178 (phys)
+Kernel executable memory footprint: 169KB
+ebp:c0123f38 eip:c01009f4 args:00010094 00000000 c0123f68 c01000df
     kern/debug/kdebug.c:309: print_stackframe+22
-ebp:c0120f48 eip:c0100cda args:00000000 00000000 00000000 c0120fb8
+ebp:c0123f48 eip:c0100ce2 args:00000000 00000000 00000000 c0123fb8
     kern/debug/kmonitor.c:129: mon_backtrace+10
-ebp:c0120f68 eip:c01000d7 args:00000000 c0120f90 ffff0000 c0120f94
-    kern/init/init.c:57: grade_backtrace2+33
-ebp:c0120f88 eip:c0100100 args:00000000 ffff0000 c0120fb4 0000002a
-    kern/init/init.c:62: grade_backtrace1+38
-ebp:c0120fa8 eip:c010011e args:00000000 c0100036 ffff0000 0000001d
-    kern/init/init.c:67: grade_backtrace0+23
-ebp:c0120fc8 eip:c0100143 args:c010969c c0109680 00001130 00000000
-    kern/init/init.c:72: grade_backtrace+34
-ebp:c0120ff8 eip:c010008b args:c0109838 c0109840 c0100c60 c010985f
-    kern/init/init.c:32: kern_init+84
+ebp:c0123f68 eip:c01000df args:00000000 c0123f90 ffff0000 c0123f94
+    kern/init/init.c:58: grade_backtrace2+33
+ebp:c0123f88 eip:c0100108 args:00000000 ffff0000 c0123fb4 0000002a
+    kern/init/init.c:63: grade_backtrace1+38
+ebp:c0123fa8 eip:c0100126 args:00000000 c0100036 ffff0000 0000001d
+    kern/init/init.c:68: grade_backtrace0+23
+ebp:c0123fc8 eip:c010014b args:c010a01c c010a000 00003178 00000000
+    kern/init/init.c:73: grade_backtrace+34
+ebp:c0123ff8 eip:c010008b args:c010a1b8 c010a1c0 c0100c68 c010a1df
+    kern/init/init.c:33: kern_init+84
 memory management: default_pmm_manager
 e820map:
   memory: 0009fc00, [00000000, 0009fbff], type = 1.
@@ -38,6 +38,8 @@ PDE(001) fac00000-fb000000 00400000 -rw
   |-- PTE(000e0) faf00000-fafe0000 000e0000 urw
   |-- PTE(00001) fafeb000-fafec000 00001000 -rw
 --------------------- END ---------------------
+use SLOB allocator
+kmalloc_init() succeeded!
 check_vma_struct() succeeded!
 page fault at 0x00000100: K/W [no page found].
 check_pgfault() succeeded!
@@ -45,7 +47,7 @@ check_vmm() succeeded.
 ide 0:      10000(sectors), 'QEMU HARDDISK'.
 ide 1:     262144(sectors), 'QEMU HARDDISK'.
 SWAP: manager = fifo swap manager
-BEGIN check_swap: count 1, total 31993
+BEGIN check_swap: count 1, total 31985
 setup Page Table for vaddr 0X1000, so alloc a page
 setup Page Table vaddr 0~4MB OVER!
 set up init env for check_swap begin!
@@ -86,26 +88,22 @@ write Virt Page a in fifo_check_swap
 page fault at 0x00001000: K/R [no page found].
 swap_out: i 0, store page in vaddr 0x2000 to disk swap entry 3
 swap_in: load disk swap entry 2 with swap_page in vadr 0x1000
-count is 0, total is 7
+count is 0, total is 5
 check_swap() succeeded!
 ++ setup timer interrupts
-100 ticks
-End of Test.
-kernel panic at kern/trap/trap.c:20:
-    EOT: kernel seems ok.
+this initproc, pid = 1, name = "init"
+To U: "Hello world!!".
+To U: "en.., Bye, Bye. :)"
+kernel panic at kern/process/proc.c:352:
+    process exit!!.
+
 stack trackback:
-ebp:c0120ee0 eip:c01009ec args:c010996c c0120f24 00000014 c0120f5c
+ebp:c030cf98 eip:c01009f4 args:c010a2ec c030cfdc 00000160 c030cfcc
     kern/debug/kdebug.c:309: print_stackframe+22
-ebp:c0120f10 eip:c0100d4b args:c0109b0e 00000014 c0109af8 00000000
+ebp:c030cfc8 eip:c0100d53 args:c010bf11 00000160 c010bf25 c012a064
     kern/debug/panic.c:27: __panic+105
-ebp:c0120f30 eip:c0102153 args:c0120f68 c0100352 c0100304 c0120f5c
-    kern/trap/trap.c:20: print_ticks+65
-ebp:c0120f60 eip:c010282b args:c0120f8c c0100375 c010999c c0120fa4
-    kern/trap/trap.c:201: trap_dispatch+204
-ebp:c0120f80 eip:c01028e9 args:c0120f8c 00000001 00000000 c0120ff8
-    kern/trap/trap.c:238: trap+16
-ebp:c0120ff8 eip:c0102901 args:c0109838 c0109840 c0100c60 c010985f
-    kern/trap/trapentry.S:24: <unknown>+0
+ebp:c030cfe8 eip:c0109003 args:00000000 c010bfa4 00000000 00000010
+    kern/process/proc.c:352: do_exit+33
 Welcome to the kernel debug monitor!!
 Type 'help' for a list of commands.
 K> 
