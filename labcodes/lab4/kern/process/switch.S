@@ -2,7 +2,7 @@
 .globl switch_to
 switch_to:                      # switch_to(from, to)
 
-    # save from's registers
+    # save from's registers, 保存老的
     movl 4(%esp), %eax          # eax points to from
     popl 0(%eax)                # save eip !popl
     movl %esp, 4(%eax)          # save esp::context of from
@@ -13,7 +13,7 @@ switch_to:                      # switch_to(from, to)
     movl %edi, 24(%eax)         # save edi::context of from
     movl %ebp, 28(%eax)         # save ebp::context of from
 
-    # restore to's registers
+    # restore to's registers, 恢复新的
     movl 4(%esp), %eax          # not 8(%esp): popped return address already
                                 # eax now points to to
     movl 28(%eax), %ebp         # restore ebp::context of to
@@ -24,7 +24,7 @@ switch_to:                      # switch_to(from, to)
     movl 8(%eax), %ebx          # restore ebx::context of to
     movl 4(%eax), %esp          # restore esp::context of to
 
-    pushl 0(%eax)               # push eip
+    pushl 0(%eax)               # push eip, ret返回push的这个eip地址
 
     ret
 
