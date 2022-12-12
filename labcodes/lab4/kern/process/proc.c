@@ -178,8 +178,11 @@ proc_run(struct proc_struct *proc) {
         local_intr_save(intr_flag);
         {
             current = proc;
+            // 设置tss的ring0内核栈地址
             load_esp0(next->kstack + KSTACKSIZE);
+            // 改页目录表地址
             lcr3(next->cr3);
+            // 切换上下文, c->a......x->c, 回来的时候prev是c, next是a?
             switch_to(&(prev->context), &(next->context));
         }
         local_intr_restore(intr_flag);
@@ -262,6 +265,7 @@ static void
 copy_thread(struct proc_struct *proc, uintptr_t esp, struct trapframe *tf) {
     proc->tf = (struct trapframe *)(proc->kstack + KSTACKSIZE) - 1;
     *(proc->tf) = *tf;
+    // 子进程的fork函数返回值为0
     proc->tf->tf_regs.reg_eax = 0;
     proc->tf->tf_esp = esp;
     proc->tf->tf_eflags |= FL_IF;
@@ -330,7 +334,7 @@ do_fork(uint32_t clone_flags, uintptr_t stack, struct trapframe *tf) {
         nr_process++;
     }
     local_intr_restore(intr_flag);
-
+    // 设置新的子进程可执行
     wakeup_proc(proc);
     ret = proc->pid;
 fork_out:
@@ -372,17 +376,23 @@ proc_init(void) {
         list_init(hash_list + i);
     }
 
+    // 分配一个proc_struct结构
     if ((idleproc = alloc_proc()) == NULL) {
         panic("cannot alloc idleproc.\n");
     }
 
+    // 第一个进程，pid为0
     idleproc->pid = 0;
+    // 改空闲进程始终可以运行
     idleproc->state = PROC_RUNNABLE;
+    // 设置内核栈
     idleproc->kstack = (uintptr_t)bootstack;
+    // 设置为可调度
     idleproc->need_resched = 1;
     set_proc_name(idleproc, "idle");
     nr_process ++;
 
+    // 设置当前运行的进程为空闲进程
     current = idleproc;
 
     int pid = kernel_thread(init_main, "Hello world!!", 0);
